@@ -51,3 +51,6 @@ const WEATHER = [
   { n: '🌈 Tempestade Arco-Íris', mut: 3 },
   { n: '🌑 Noite Sigma',          mut: 4 }
 ];
+
+// cores dos 8 jogadores / bases
+const SEATC = ['#3aa0ff', '#ff5555', '#55d855', '#ffd52a', '#c070ff', '#ff9a1a', '#2fd8c0', '#ff8ac8'];
