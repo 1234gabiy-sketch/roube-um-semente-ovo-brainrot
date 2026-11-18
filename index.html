@@ -7,7 +7,18 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div id="menu"><div class="box">
+<div id="login"><div class="box">
+  <h1>🥚 Brainrot Garden</h1>
+  <input id="ln" maxlength="12" placeholder="Nome"><input id="lp" type="password" placeholder="Senha">
+  <button onclick="login()">Entrar / Criar conta</button><p id="lstat"></p>
+</div></div>
+<div id="device" style="display:none"><div class="box">
+  <h1>Onde estás a jogar?</h1>
+  <button onclick="setDevice('pc')">💻 Computador</button>
+  <button onclick="setDevice('mobile')">📱 Telemóvel</button>
+  <button onclick="setDevice('ps')">🎮 PlayStation (comando)</button>
+</div></div>
+<div id="menu" style="display:none"><div class="box">
   <h1>🥚 Brainrot Garden</h1>
   <button onclick="createRoom()">Criar sala</button>
   <div class="join"><input id="code" maxlength="6" inputmode="numeric" placeholder="Código (6 números)"><button onclick="joinRoom($('code').value.trim())">Entrar</button></div>
@@ -37,7 +48,16 @@
   <button onclick="sellPlant()">Vender planta (V)</button>
   <button onclick="lockGate()">Portão (G)</button>
 </div>
-<p id="help">WASD ou setas para mover. Fica perto da esteira vermelha e compra (B) ou rouba (E). Vende com o 💲 da mochila ou com V perto de uma planta. Planta (F) na tua quinta e rega (R). Equipamentos: teclas 1 a 5.</p>
+<p id="help">WASD ou setas para mover. Fica perto da esteira vermelha e compra (B) ou rouba (E), e também ovos maduros de bases destrancadas. Vende com o 💲 da mochila ou com V perto de uma planta. Planta (F) na tua quinta e rega (R). Equipamentos: teclas 1 a 5.</p>
+<button id="adminBtn" onclick="$('admin').classList.toggle('open')">🛠️ Admin</button>
+<div id="admin">
+  <h3>🛠️ Painel ADM</h3>
+  <div class="arow"><button onclick="tg('inf')">💰 Dinheiro infinito</button><button onclick="tg('fast')">⚡ Velocidade x2</button><button onclick="tg('god')">🛡️ Sem polícia</button><button onclick="tg('ghost')">👻 Invisível</button></div>
+  <div class="arow"><select id="aegg"></select><button onclick="adminGive()">Dar ovo</button></div>
+  <div class="arow"><select id="awt"></select><button onclick="adminWeather()">Evento</button></div>
+  <div class="arow"><input id="acmd" placeholder="/kill nome, /kick nome, /say texto"><button onclick="adminCmd()">OK</button></div>
+  <p id="aplayers"></p>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="database.js"></script>
 <script src="network.js"></script>
