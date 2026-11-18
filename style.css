@@ -22,7 +22,7 @@ button:active{transform:translateY(3px);box-shadow:none}
 #help{text-align:center;font-size:13px;opacity:.8;margin:4px 12px 100px}
 #joy{display:none;position:absolute;left:10px;bottom:10px;width:110px;height:110px;border-radius:50%;background:#fff3;border:3px solid #fff8;touch-action:none}
 #knob{position:absolute;left:35px;top:35px;width:40px;height:40px;border-radius:50%;background:#fff}
-@media (pointer:coarse){#joy,#acts{display:flex}#help{display:none}}
+body[data-dev=mobile] #joy,body[data-dev=mobile] #acts{display:flex}
 #menu{position:fixed;inset:0;z-index:9;background:#2b1b5aee;display:flex;align-items:center;justify-content:center}
 #menu .box{background:#4b2ea6;border:5px solid #222;border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:10px;width:min(340px,92%);text-align:center}
 #menu h1{margin:0;font-size:26px}
@@ -30,3 +30,14 @@ button:active{transform:translateY(3px);box-shadow:none}
 #menu input{flex:1;min-width:0;font:inherit;padding:6px 10px;border:3px solid #222;border-radius:12px;text-align:center}
 #rooms{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;font-size:13px}
 #mstat{margin:0;font-size:13px;min-height:16px}
+#login,#device{position:fixed;inset:0;z-index:10;background:#2b1b5aee;display:flex;align-items:center;justify-content:center}
+#login .box,#device .box{background:#4b2ea6;border:5px solid #222;border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:10px;width:min(340px,92%);text-align:center}
+#login h1,#device h1{margin:0;font-size:24px}
+#login input{font:inherit;padding:6px 10px;border:3px solid #222;border-radius:12px;text-align:center}
+#lstat{margin:0;font-size:13px;min-height:16px}
+#adminBtn{display:none;position:fixed;top:50px;right:8px;z-index:8;background:#ff3b3b;color:#fff}
+#admin{display:none;position:fixed;top:92px;right:8px;z-index:8;width:min(320px,94%);background:#222;border:4px solid #ff3b3b;border-radius:14px;padding:10px}
+#admin.open{display:block}
+.arow{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}
+.arow select,.arow input{flex:1;min-width:0;font:inherit;font-size:12px;padding:4px;border-radius:8px}
+#aplayers{font-size:12px;margin:0}
