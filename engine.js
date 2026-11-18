@@ -36,13 +36,14 @@ function step(dt) {
   }
 
   // esteira
-  if ((G.bt -= dt) <= 0) {
+  if (Net.isAuth() && (G.bt -= dt) <= 0) {
     G.bt = 2.2;
     const r = roll(), pool = EGGS.filter(e => e.r === r), e = pool[0 | Math.random() * pool.length];
     G.belt.push(new BeltEgg(e));
     if (r >= 5) { const m = '🌟 ' + RAR[r].n.toUpperCase() + ' NA ESTEIRA: ' + e.name + '!'; toast(m, RAR[r].c); Net.send({ t: 'ann', m }); }
   }
   G.belt.forEach(b => b.x += 1);
+  if (Net.host && frame % 30 === 0) Net.send({ t: 'belt', l: G.belt.map(b => [b.k, b.e.id, Math.round(b.x)]) });
   G.belt = G.belt.filter(b => b.x < 920 || (b.gone = true, false));
 
   // plantas
@@ -58,14 +59,9 @@ function step(dt) {
   if (G.gate.locked) { if ((G.gate.t -= dt) <= 0) { G.gate.locked = false; G.gate.cd = 20; } }
   else if (G.gate.cd > 0) G.gate.cd -= dt;
 
-  // bots, polícias, armadilhas
-  if ((G.bs -= dt) <= 0) { G.bs = 7; if (G.bots.length < 4) G.bots.push(new Bot()); }
-  G.bots.forEach(b => {
-    b.update();
-    G.traps.forEach((t, i) => { if (Math.hypot(b.x - t.x, b.y - t.y) < 20) { b.stun = 240; G.traps.splice(i, 1); toast('🪤 Bot apanhado na armadilha!', '#fa0'); } });
-  });
-  G.cops.forEach(c => c.update());
-  G.bots = G.bots.filter(b => !b.dead); G.cops = G.cops.filter(c => !c.dead);
+  // polícias e armadilhas
+  G.cops.forEach(c => { c.update(); G.traps.forEach((t, i) => { if (Math.hypot(c.x - t.x, c.y - t.y) < 22) { c.stun = 240; G.traps.splice(i, 1); toast('🪤 Polícia preso na armadilha!', '#fa0'); } }); });
+  G.cops = G.cops.filter(c => !c.dead);
   G.parts.forEach(q => { q.x += q.vx; q.y += q.vy; q.l--; }); G.parts = G.parts.filter(q => q.l > 0);
 
   if (frame % 6 === 0) { Net.send({ t: 'pos', x: p.x, y: p.y }); Net.clean(); }
@@ -112,7 +108,6 @@ function draw() {
 
   // entidades
   Object.values(Net.peers).forEach(q => icon({ x: q.x, y: q.y, i: '🧑' }, .6));
-  G.bots.forEach(b => icon(b, b.stun > 0 ? .5 : 1));
   G.cops.forEach(c => { icon(c); cx.font = '16px serif'; cx.fillText(frame % 20 < 10 ? '🔴' : '🔵', c.x, c.y - 20); });
   icon(G.p, G.p.invis > 0 ? .3 : 1);
   G.parts.forEach(q => { cx.fillStyle = q.c; cx.globalAlpha = q.l / 40; cx.fillRect(q.x, q.y, 4, 4); cx.globalAlpha = 1; });
@@ -127,5 +122,5 @@ function draw() {
 
 function loop(t) {
   const dt = Math.min(.05, (t - last) / 1000); last = t;
-  step(dt); draw(); requestAnimationFrame(loop);
+  if (G.started) step(dt); draw(); requestAnimationFrame(loop);
 }
