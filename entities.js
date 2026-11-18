@@ -14,7 +14,7 @@ class Player extends Ent {
 }
 
 class BeltEgg {
-  constructor(e) { this.e = e; this.x = -20; this.y = 300; this.gone = false; }
+  constructor(e) { this.e = e; this.x = -20; this.y = 300; this.gone = false; this.k = Math.random().toString(36).slice(2, 8); }
 }
 
 class Plant {
@@ -26,39 +26,13 @@ class Plant {
   get gps() { return this.e.gps * MUT[this.mut].m * G.mult * (this.ready ? 1 : 0.5); }
 }
 
-class Bot extends Ent {
-  constructor() {
-    super(Math.random() * 800 + 50, -20, '🥷');
-    this.sp = 1.6 + Math.random() * 0.6; this.stun = 0; this.tgt = null;
-  }
-  update() {
-    if (this.stun > 0) { this.stun--; return; }
-    if (this.carry) { this.go(this.x, -40, this.sp * 1.3); if (this.y < -30) this.dead = true; return; }
-    if (!this.tgt || this.tgt.gone) {
-      this.tgt = null;
-      const ripe = G.plants.filter(p => p.ready);
-      if (!G.gate.locked && ripe.length && Math.random() < 0.6) this.tgt = ripe[0 | Math.random() * ripe.length];
-      else if (G.belt.length) this.tgt = G.belt[0 | Math.random() * G.belt.length];
-      if (!this.tgt) { this.go(450, 200, 1); return; }
-    }
-    const t = this.tgt, isPlant = t instanceof Plant;
-    const [tx, ty] = isPlant ? slotPos(t.slot) : [t.x, t.y];
-    if (this.go(tx, ty, this.sp) < 14) {
-      t.gone = true;
-      if (isPlant) { G.plants = G.plants.filter(p => p !== t); sfx('alarm'); toast('🚨 Um bot roubou ' + t.e.name + ' da tua quinta!', '#e33'); }
-      else G.belt = G.belt.filter(b => b !== t);
-      this.carry = t.e; this.tgt = null; G.dirty = 1;
-      G.cops.push(new Cop(this));
-    }
-  }
-}
-
 class Cop extends Ent {
   constructor(target) {
     super(target.x < 450 ? -30 : 930, 300, '👮');
     this.t = target; this.sp = 2.3; this.life = 900;
   }
   update() {
+    if (this.stun > 0) { this.stun--; return; }
     const t = this.t, isP = t instanceof Player;
     if (--this.life <= 0 || t.dead || (isP && !G.inv.some(i => i.stolen))) { this.dead = true; return; }
     if (isP && t.invis > 0) return; // perdeu-te de vista
