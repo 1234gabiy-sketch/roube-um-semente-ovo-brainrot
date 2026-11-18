@@ -1,4 +1,6 @@
-function slotPos(i) { return [110 + (i % 6) * 130, 450 + Math.floor(i / 6) * 70]; }
+// 8 bases: lugares 0-3 em baixo, 4-7 em cima, esteira ao meio
+function basePos(s) { return [12 + (s % 4) * 225, s < 4 ? 375 : 10]; }
+function slotPos(i, s = G.seat) { const [bx, by] = basePos(s); return [bx + 35 + (i % 3) * 65, by + 40 + Math.floor(i / 3) * 48]; }
 
 class Ent {
   constructor(x, y, icon) { this.x = x; this.y = y; this.i = icon; this.sp = 2; this.carry = null; this.dead = false; }
@@ -10,7 +12,7 @@ class Ent {
 }
 
 class Player extends Ent {
-  constructor() { super(450, 500, '🧑'); this.jail = 0; this.invis = 0; this.boost = 0; }
+  constructor() { super(450, 500, '🧑'); this.jail = 0; this.invis = 0; this.boost = 0; this.mv = false; this.dir = 1; }
 }
 
 class BeltEgg {
@@ -32,6 +34,7 @@ class Cop extends Ent {
     this.t = target; this.sp = 2.3; this.life = 900;
   }
   update() {
+    if (G.god) { this.dead = true; return; }
     if (this.stun > 0) { this.stun--; return; }
     const t = this.t, isP = t instanceof Player;
     if (--this.life <= 0 || t.dead || (isP && !G.inv.some(i => i.stolen))) { this.dead = true; return; }
@@ -40,7 +43,7 @@ class Cop extends Ent {
       if (isP) {
         const fine = Math.min(G.money, 200 + G.inv.filter(i => i.stolen).length * 100);
         G.inv = G.inv.filter(i => !i.stolen); G.money -= fine;
-        t.jail = G.reb > 0 ? 300 : 600; t.x = 60; t.y = 60;
+        t.jail = G.reb > 0 ? 300 : 600; t.x = 450; t.y = 252;
         toast('👮 Preso! Multa de ' + fine + ' e ovo confiscado.', '#e33'); sfx('siren'); G.dirty = 1;
       } else { t.dead = true; t.carry = null; }
       this.dead = true;
