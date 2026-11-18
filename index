@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Brainrot Garden</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="hud"><span id="money"></span><span id="weather"></span><span id="gate"></span><span id="reb"></span></div>
+<div id="main">
+  <div id="stage">
+    <canvas id="c" width="900" height="600"></canvas>
+    <div id="toasts"></div>
+    <div id="joy"><div id="knob"></div></div>
+  </div>
+  <aside id="side">
+    <section><h3>🛒 Loja de Equipamentos</h3><div id="shop"></div></section>
+    <section><h3>🎒 Mochila (clica para plantar)</h3><div id="inv"></div></section>
+    <section><h3>🔄 Rebirth</h3><button id="rbtn" onclick="rebirth()"></button></section>
+  </aside>
+</div>
+<div id="acts">
+  <button onclick="buy()">Comprar (B)</button>
+  <button onclick="steal()">Roubar (E)</button>
+  <button onclick="plantInv(0)">Plantar (F)</button>
+  <button onclick="water()">Regar (R)</button>
+  <button onclick="lockGate()">Portão (G)</button>
+</div>
+<p id="help">WASD ou setas para mover. Fica perto da esteira vermelha e compra (B) ou rouba (E). Planta (F) na tua quinta e rega (R). Equipamentos: teclas 1 a 5.</p>
+<script src="database.js"></script>
+<script src="network.js"></script>
+<script src="entities.js"></script>
+<script src="engine.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
