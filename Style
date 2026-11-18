@@ -1,0 +1,25 @@
+*{box-sizing:border-box}
+body{margin:0;background:#2b1b5a;color:#fff;font-family:'Chalkboard SE','Comic Sans MS',system-ui,sans-serif;font-weight:700;overscroll-behavior:none}
+#hud{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;padding:8px;background:#ff8a00;border-bottom:4px solid #222}
+#hud span{background:#222;border-radius:20px;padding:4px 14px;font-size:15px}
+#main{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;padding:10px}
+#stage{position:relative;width:min(900px,100%)}
+canvas{width:100%;height:auto;border:5px solid #222;border-radius:14px;background:#7ed957;display:block;touch-action:none}
+#toasts{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none;width:90%}
+.toast{padding:8px 16px;border-radius:14px;border:3px solid #222;color:#fff;text-shadow:1px 1px #000;animation:pop .35s ease-out}
+@keyframes pop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+#side{width:280px;display:flex;flex-direction:column;gap:10px}
+#side section{background:#4b2ea6;border:4px solid #222;border-radius:14px;padding:10px}
+h3{margin:0 0 8px;font-size:15px}
+button{font:inherit;cursor:pointer;background:#ffd60a;color:#222;border:3px solid #222;border-radius:12px;padding:6px 10px;box-shadow:0 3px #222}
+button:active{transform:translateY(3px);box-shadow:none}
+.row{display:flex;gap:4px;align-items:center;margin-bottom:6px;font-size:13px}
+.row b{flex:1}
+#inv{display:flex;flex-wrap:wrap;gap:6px;min-height:30px}
+#inv button{border-width:4px;font-size:12px;background:#fff}
+#rbtn{width:100%;background:#ff3cac;color:#fff}
+#acts{display:none;gap:6px;justify-content:center;flex-wrap:wrap;padding:6px}
+#help{text-align:center;font-size:13px;opacity:.8;margin:4px 12px 100px}
+#joy{display:none;position:absolute;left:10px;bottom:10px;width:110px;height:110px;border-radius:50%;background:#fff3;border:3px solid #fff8;touch-action:none}
+#knob{position:absolute;left:35px;top:35px;width:40px;height:40px;border-radius:50%;background:#fff}
+@media (pointer:coarse){#joy,#acts{display:flex}#help{display:none}}
