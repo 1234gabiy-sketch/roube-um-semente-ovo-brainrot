@@ -3,7 +3,7 @@
 const LOBBY = 'brz-lobby-v1';
 const Net = {
   id: Math.random().toString(36).slice(2),
-  host: false, code: '', peers: {}, handlers: [], conns: [], hostConn: null, rooms: {},
+  host: false, code: '', peers: {}, farms: {}, handlers: [], conns: [], hostConn: null, rooms: {},
   isAuth() { return !this.hostConn; },
   mk(id) { return typeof Peer === 'undefined' ? null : (id ? new Peer(id) : new Peer()); },
   create(ok, err) {
@@ -13,7 +13,11 @@ const Net = {
     p.on('error', e => e.type === 'unavailable-id' ? this.create(ok, err) : err(e.type));
   },
   add(c) {
-    c.on('open', () => this.conns.push(c));
+    c.on('open', () => {
+      if (this.conns.length >= 7) { c.send({ t: 'full' }); setTimeout(() => c.close(), 400); return; } // máx. 8 jogadores
+      const used = new Set(this.conns.map(x => x.seat)); let s = 1; while (used.has(s)) s++;
+      c.seat = s; this.conns.push(c); c.send({ t: 'seat', n: s });
+    });
     c.on('data', m => this.rx(m, c));
     c.on('close', () => { this.conns = this.conns.filter(x => x !== c); });
   },
@@ -35,11 +39,15 @@ const Net = {
   rx(m, from) {
     if (!m || m.id === this.id) return;
     if (this.host) this.conns.forEach(c => c !== from && c.open && c.send(m)); // retransmite
-    if (m.t === 'pos') this.peers[m.id] = { x: m.x, y: m.y, seen: Date.now() };
+    if (m.t === 'pos') this.peers[m.id] = { x: m.x, y: m.y, s: m.s, mv: m.mv, dir: m.dir, name: m.name, seen: Date.now() };
+    if (m.t === 'farm') this.farms[m.id] = { s: m.s, g: m.g, l: m.l, seen: Date.now() };
     this.handlers.forEach(f => f(m));
   },
   on(f) { this.handlers.push(f); },
-  clean() { for (const k in this.peers) if (Date.now() - this.peers[k].seen > 2000) delete this.peers[k]; },
+  clean() {
+    for (const k in this.peers) if (Date.now() - this.peers[k].seen > 2000) delete this.peers[k];
+    for (const k in this.farms) if (Date.now() - this.farms[k].seen > 4000) delete this.farms[k];
+  },
 
   // ---- Lobby: o primeiro anfitrião vira lista de salas, os outros registam-se nele ----
   reg() {
