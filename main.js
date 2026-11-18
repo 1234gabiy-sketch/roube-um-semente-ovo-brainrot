@@ -1,5 +1,5 @@
 const G = {
-  money: 50, inv: [], plants: [], belt: [], bots: [], cops: [], parts: [], traps: [],
+  money: 50, inv: [], plants: [], belt: [], started: false, cops: [], parts: [], traps: [],
   gear: { bat: 0, water: 0, trap: 0, cloak: 0, drink: 0 },
   slots: 4, reb: 0, mult: 1, turbo: 0, weather: 0, wt: 20, bt: 0.5, bs: 4, time: 0,
   gate: { locked: false, t: 0, cd: 0 }, dirty: 1, p: new Player()
@@ -33,7 +33,21 @@ function toast(msg, color = '#333') {
   $('toasts').appendChild(d); setTimeout(() => d.remove(), 3500);
   if ($('toasts').children.length > 4) $('toasts').firstChild.remove();
 }
-Net.on(m => { if (m.t === 'ann') toast(m.m, '#fa0'); });
+Net.on(m => {
+  const p = G.p;
+  if (m.t === 'ann') toast(m.m, '#fa0');
+  if (m.t === 'take') G.belt = G.belt.filter(b => b.k !== m.k);
+  if (m.t === 'belt' && Net.hostConn) {
+    const old = Object.fromEntries(G.belt.map(b => [b.k, b]));
+    G.belt = m.l.map(([k, id, x]) => { const b = old[k] || new BeltEgg(EGGS[id]); b.k = k; b.x = x; return b; });
+  }
+  if (m.t === 'slap' && Math.hypot(p.x - m.x, p.y - m.y) < 90) {
+    const lost = G.inv.some(i => i.stolen); G.inv = G.inv.filter(i => !i.stolen);
+    const a = Math.atan2(p.y - m.y, p.x - m.x);
+    p.x = Math.max(14, Math.min(886, p.x + Math.cos(a) * 90)); p.y = Math.max(14, Math.min(586, p.y + Math.sin(a) * 90));
+    toast(lost ? '🏏 Slap! Largaste o ovo roubado!' : '🏏 Levaste um slap!', '#e33'); G.dirty = 1;
+  }
+});
 
 // ---------- Inputs ----------
 const keys = {};
@@ -49,7 +63,7 @@ const Input = {
 addEventListener('keydown', e => {
   const k = e.key.toLowerCase(); keys[k] = 1;
   if (k.startsWith('arrow') || k === ' ') e.preventDefault();
-  const act = { b: buy, e: steal, f: () => plantInv(0), r: water, g: lockGate }[k];
+  const act = { b: buy, e: steal, f: () => plantInv(0), r: water, g: lockGate, v: sellPlant }[k];
   if (act) act();
   if (k >= '1' && k <= '5') useGear(GEAR[k - 1].id);
 });
@@ -71,7 +85,7 @@ function nearBelt() {
   return best;
 }
 function take(b, stolen) {
-  b.gone = true; G.belt = G.belt.filter(x => x !== b); G.inv.push({ e: b.e, stolen }); G.dirty = 1;
+  b.gone = true; G.belt = G.belt.filter(x => x !== b); G.inv.push({ e: b.e, stolen }); G.dirty = 1; Net.send({ t: 'take', k: b.k });
 }
 function buy() {
   const b = nearBelt(); if (!b || G.p.jail) return;
@@ -108,12 +122,7 @@ function buyGear(id) {
 function useGear(id) {
   if (G.gear[id] < 1) return toast('Não tens esse equipamento. Compra na loja!', '#fa0');
   G.gear[id]--; G.dirty = 1; const p = G.p;
-  if (id === 'bat') G.bots.forEach(b => {
-    if (Math.hypot(b.x - p.x, b.y - p.y) < 90) {
-      b.stun = 120; if (b.carry) { const be = new BeltEgg(b.carry); be.x = Math.max(0, Math.min(880, b.x)); G.belt.push(be); b.carry = null; }
-      b.x += (b.x - p.x) * 1.2; burst(b.x, b.y, '#fff');
-    }
-  });
+  if (id === 'bat') { Net.send({ t: 'slap', x: p.x, y: p.y }); burst(p.x, p.y, '#fff', 20); }
   if (id === 'water') G.turbo = 20;
   if (id === 'trap') G.traps.push({ x: p.x, y: p.y });
   if (id === 'cloak') p.invis = 300;
@@ -134,13 +143,38 @@ function ui() {
   $('money').textContent = '💰 ' + fmt(G.money) + ' (+' + fmt(income()) + '/s)';
   $('weather').textContent = WEATHER[G.weather].n;
   $('gate').textContent = G.gate.locked ? '🔒 Portão ' + Math.ceil(G.gate.t) + 's' : G.gate.cd > 0 ? '⏳ Portão ' + Math.ceil(G.gate.cd) + 's' : '🔓 Portão aberto (G)';
-  $('reb').textContent = '🔄 Rebirth ' + G.reb + ' / ' + (Net.mode === 'ws' ? 'online' : 'local+bots');
+  $('reb').textContent = '🔄 Rebirth ' + G.reb + ' | ' + (Net.code ? 'Sala ' + Net.code + ' (' + (Object.keys(Net.peers).length + 1) + ' jogadores)' : 'Solo');
   $('rbtn').textContent = 'Rebirth por $' + fmt(20000 * (G.reb + 1));
   if (!G.dirty) return; G.dirty = 0;
   $('shop').innerHTML = GEAR.map((g, i) =>
     `<div class="row"><b>${i + 1}. ${g.n}</b><button onclick="buyGear('${g.id}')">$${g.p}</button><button onclick="useGear('${g.id}')">x${G.gear[g.id]}</button></div>`).join('');
   $('inv').innerHTML = G.inv.map((it, i) =>
-    `<button style="border-color:${RAR[it.e.r].c}" onclick="plantInv(${i})">${it.e.name}${it.stolen ? ' 🚨' : ''}</button>`).join('') || 'Vazia. Vai à esteira!';
+    `<span><button style="border-color:${RAR[it.e.r].c}" onclick="plantInv(${i})">${it.e.name}${it.stolen ? ' 🚨' : ''}</button><button onclick="sellItem(${i})">💲${fmt(it.e.price * .6)}</button></span>`).join('') || 'Vazia. Vai à esteira!';
+}
+// ---------- Vender ----------
+function sellItem(i) {
+  const it = G.inv[i]; if (!it) return;
+  G.money += Math.floor(it.e.price * .6); G.inv.splice(i, 1); sfx('coin'); G.dirty = 1;
+}
+function sellPlant() {
+  let b = null, m = 60;
+  G.plants.forEach(pl => { const [x, y] = slotPos(pl.slot), d = Math.hypot(x - G.p.x, y - G.p.y); if (d < m) { m = d; b = pl; } });
+  if (!b) return toast('Chega-te a uma planta para a vender', '#fa0');
+  G.money += Math.floor(b.e.price * .6 * MUT[b.mut].m); G.plants = G.plants.filter(p => p !== b); sfx('coin');
+}
+
+// ---------- Menu de salas ----------
+const mst = t => $('mstat').textContent = t;
+function startGame() { G.started = true; $('menu').style.display = 'none'; G.dirty = 1; }
+function solo() { startGame(); }
+function createRoom() { mst('A criar sala...'); Net.create(c => { toast('Sala criada! Código: ' + c, '#3a3'); startGame(); }, e => mst('Erro: ' + e)); }
+function joinRoom(c) {
+  if (!/^\d{6}$/.test(c)) return mst('O código tem 6 números');
+  mst('A entrar...'); Net.join(c, startGame, e => mst('Erro: ' + e));
+}
+function findRooms() {
+  $('rooms').textContent = 'A procurar...';
+  Net.list(l => { $('rooms').innerHTML = l.length ? l.map(c => `<button onclick="joinRoom('${c}')">Sala ${c}</button>`).join('') : 'Nenhuma sala encontrada'; });
 }
 setInterval(ui, 200);
 requestAnimationFrame(loop);
