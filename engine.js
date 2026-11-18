@@ -15,19 +15,19 @@ function burst(x, y, c, n = 12) {
 }
 
 function step(dt) {
-  frame++; G.time += dt;
+  frame++; G.time += dt; pad();
   const p = G.p;
-  if (p.jail > 0) { if (--p.jail === 0) { p.x = 450; p.y = 500; toast('Libertado! Tenta ser honesto.', '#6d6'); } }
+  if (p.jail > 0) { if (--p.jail === 0) { respawn(); toast('Libertado! Tenta ser honesto.', '#6d6'); } }
   else {
-    const v = Input.vec(), s = p.boost > 0 ? 5 : 3.2;
+    const v = Input.vec(), s = (p.boost > 0 ? 5 : 3.2) * (G.fast ? 2 : 1); p.mv = !!(v[0] || v[1]); if (v[0]) p.dir = v[0] > 0 ? 1 : -1;
     p.x = Math.max(14, Math.min(886, p.x + v[0] * s)); p.y = Math.max(14, Math.min(586, p.y + v[1] * s));
   }
-  if (p.invis > 0) p.invis--; if (p.boost > 0) p.boost--;
+  if (G.ghost) p.invis = 9; if (p.invis > 0) p.invis--; if (p.boost > 0) p.boost--;
   if (G.turbo > 0) G.turbo -= dt;
 
   // clima + mutações
   if ((G.wt -= dt) <= 0) {
-    G.wt = 30; G.weather = 0 | Math.random() * WEATHER.length;
+    G.wt = 30; G.weather = G.fw != null ? G.fw : 0 | Math.random() * WEATHER.length; G.fw = null;
     const w = WEATHER[G.weather];
     if (w.mut) {
       toast('Evento: ' + w.n + '! Mutações a caminho', MUT[w.mut].c === 'rainbow' ? '#e0f' : MUT[w.mut].c || '#888');
@@ -53,7 +53,7 @@ function step(dt) {
   });
   const inc = income() * dt;
   if (inc > 0 && frame % 120 === 0) sfx('coin');
-  G.money += inc;
+  G.money += inc; if (G.inf) G.money = 1e15;
 
   // portão
   if (G.gate.locked) { if ((G.gate.t -= dt) <= 0) { G.gate.locked = false; G.gate.cd = 20; } }
@@ -64,7 +64,8 @@ function step(dt) {
   G.cops = G.cops.filter(c => !c.dead);
   G.parts.forEach(q => { q.x += q.vx; q.y += q.vy; q.l--; }); G.parts = G.parts.filter(q => q.l > 0);
 
-  if (frame % 6 === 0) { Net.send({ t: 'pos', x: p.x, y: p.y }); Net.clean(); }
+  if (frame % 6 === 0) { Net.send({ t: 'pos', x: p.x, y: p.y, s: G.seat, mv: p.mv, dir: p.dir, name: G.name }); Net.clean(); }
+  if (frame % 30 === 0) Net.send({ t: 'farm', s: G.seat, g: G.gate.locked ? 1 : 0, l: G.plants.map(q => [q.e.id, q.mut, q.slot, q.ready ? 1 : 0]) });
 }
 
 function drawEgg(e, x, y, s, m) {
@@ -74,17 +75,27 @@ function drawEgg(e, x, y, s, m) {
   cx.strokeStyle = m ? (MUT[m].c === 'rainbow' ? `hsl(${G.time * 200 % 360},100%,60%)` : MUT[m].c) : '#222';
   cx.stroke(); cx.restore();
 }
-function icon(en, a = 1) {
-  cx.globalAlpha = a; cx.font = '26px serif'; cx.textAlign = 'center'; cx.fillText(en.i, en.x, en.y + 9);
-  if (en.carry) cx.fillText('🥚', en.x, en.y - 14);
-  cx.globalAlpha = 1;
+function drawChar(x, y, col, t, mv, dir, o = {}) {
+  const sw = mv ? Math.sin(t * 14) : 0, bob = mv ? Math.abs(Math.cos(t * 14)) * 2 : Math.sin(t * 3) * .8;
+  cx.save(); cx.globalAlpha = o.a || 1; cx.translate(x, y - bob); cx.scale(dir < 0 ? -1 : 1, 1); cx.lineCap = 'round';
+  cx.fillStyle = 'rgba(0,0,0,.25)'; cx.beginPath(); cx.ellipse(0, 19 + bob, 11, 4, 0, 0, 7); cx.fill();
+  cx.lineWidth = 5; cx.strokeStyle = '#2b2b4a'; // pernas
+  cx.beginPath(); cx.moveTo(-4, 6); cx.lineTo(-4 + sw * 6, 18); cx.moveTo(4, 6); cx.lineTo(4 - sw * 6, 18); cx.stroke();
+  cx.strokeStyle = '#ffcf9f'; // braços (balançam ao contrário das pernas)
+  cx.beginPath(); cx.moveTo(-8, -4); cx.lineTo(-12 - sw * 3, 5 + sw * 4); cx.moveTo(8, -4); cx.lineTo(12 + sw * 3, 5 - sw * 4); cx.stroke();
+  cx.fillStyle = col; cx.fillRect(-8, -8, 16, 15); cx.strokeStyle = '#222'; cx.lineWidth = 2; cx.strokeRect(-8, -8, 16, 15);
+  cx.fillStyle = '#ffcf9f'; cx.beginPath(); cx.arc(0, -15, 8, 0, 7); cx.fill(); cx.stroke();
+  cx.fillStyle = '#222'; cx.fillRect(1, -17, 2, 3); cx.fillRect(5, -17, 2, 3);
+  if (o.cop) { cx.fillStyle = '#0b2a8a'; cx.fillRect(-9, -25, 18, 6); cx.fillRect(-1, -20, 10, 2); }
+  if (o.egg) { cx.fillStyle = '#fe8'; cx.beginPath(); cx.ellipse(0, -33, 6, 8, 0, 0, 7); cx.fill(); cx.stroke(); }
+  cx.restore();
 }
 
 function draw() {
   cx.fillStyle = '#7ed957'; cx.fillRect(0, 0, 900, 600);
   cx.fillStyle = '#6cc84a';
   for (let i = 0; i < 900; i += 60) for (let j = 0; j < 600; j += 60) if ((i + j) / 60 % 2 === 0) cx.fillRect(i, j, 60, 60);
-  cx.fillStyle = '#555'; cx.fillRect(20, 20, 80, 80); cx.fillStyle = '#fff'; cx.font = '13px sans-serif'; cx.textAlign = 'center'; cx.fillText('CADEIA', 60, 64);
+  cx.fillStyle = '#555'; cx.fillRect(420, 232, 60, 40); cx.fillStyle = '#fff'; cx.font = '12px sans-serif'; cx.textAlign = 'center'; cx.fillText('CADEIA', 450, 256);
 
   // esteira
   cx.fillStyle = '#c0262d'; cx.fillRect(0, 278, 900, 44);
@@ -94,22 +105,37 @@ function draw() {
     cx.fillStyle = '#fff'; cx.font = '10px sans-serif'; cx.textAlign = 'center'; cx.fillText('$' + fmt(b.e.price), b.x, b.y + 32);
   });
 
-  // quinta
-  cx.fillStyle = '#b5834f'; cx.fillRect(40, 400, 820, 190);
-  cx.lineWidth = 6; cx.strokeStyle = G.gate.locked ? '#e33' : '#3c3'; cx.strokeRect(40, 400, 820, 190);
-  for (let i = 0; i < G.slots; i++) { const [x, y] = slotPos(i); cx.fillStyle = '#5a3a1c'; cx.fillRect(x - 32, y - 26, 64, 52); }
-  G.plants.forEach(pl => {
-    const [x, y] = slotPos(pl.slot);
-    if (pl.ready) { drawEgg(pl.e, x, y, 1, pl.mut); cx.font = '18px serif'; cx.fillText('🐣', x, y + 6); }
-    else { drawEgg(pl.e, x, y, .6, pl.mut); cx.fillStyle = '#222'; cx.fillRect(x - 24, y + 20, 48, 5); cx.fillStyle = '#4f4'; cx.fillRect(x - 24, y + 20, 48 * pl.age / pl.e.grow, 5); }
-    if (pl.w > 0) { cx.font = '14px serif'; cx.fillText('💧', x + 18, y - 14); }
-  });
-  G.traps.forEach(t => { cx.font = '20px serif'; cx.fillText('🪤', t.x, t.y + 6); });
+  // 8 bases
+  for (let s = 0; s < 8; s++) {
+    const [bx, by] = basePos(s), me = s === G.seat, f = Object.values(Net.farms).find(a => a.s === s);
+    if (!me && !f) { cx.fillStyle = '#9aa39a'; cx.fillRect(bx, by, 200, 215); cx.fillStyle = '#fff'; cx.font = '13px sans-serif'; cx.textAlign = 'center'; cx.fillText('Base ' + (s + 1) + ' (livre)', bx + 100, by + 110); continue; }
+    const locked = me ? G.gate.locked : f.g;
+    cx.fillStyle = '#b5834f'; cx.fillRect(bx, by, 200, 215);
+    cx.lineWidth = me ? 6 : 3; cx.strokeStyle = SEATC[s]; cx.strokeRect(bx, by, 200, 215);
+    cx.fillStyle = locked ? '#e33' : '#3c3'; cx.fillRect(bx + 60, s < 4 ? by - 3 : by + 211, 80, 7);
+    cx.fillStyle = '#fff'; cx.font = '12px sans-serif'; cx.textAlign = 'center'; cx.fillText(me ? 'A TUA BASE' : 'Base ' + (s + 1), bx + 100, by + 12);
+    const list = me ? G.plants.map(p => [p.e.id, p.mut, p.slot, p.ready, p]) : f.l;
+    const n = me ? G.slots : Math.max(4, ...f.l.map(a => a[2] + 1));
+    for (let i = 0; i < n; i++) { const [x, y] = slotPos(i, s); cx.fillStyle = '#5a3a1c'; cx.fillRect(x - 28, y - 21, 56, 42); }
+    list.forEach(([id, m, sl, rd, pl]) => {
+      const [x, y] = slotPos(sl, s), e = EGGS[id];
+      drawEgg(e, x, y, rd ? 1 : .6, m);
+      if (rd) { cx.font = '16px serif'; cx.fillText('🐣', x, y + 6); }
+      else if (pl) { cx.fillStyle = '#222'; cx.fillRect(x - 22, y + 14, 44, 4); cx.fillStyle = '#4f4'; cx.fillRect(x - 22, y + 14, 44 * pl.age / e.grow, 4); }
+      if (pl && pl.w > 0) { cx.font = '13px serif'; cx.fillText('💧', x + 18, y - 12); }
+    });
+  }
+  G.traps.forEach(t => { cx.font = '20px serif'; cx.textAlign = 'center'; cx.fillText('🪤', t.x, t.y + 6); });
 
-  // entidades
-  Object.values(Net.peers).forEach(q => icon({ x: q.x, y: q.y, i: '🧑' }, .6));
-  G.cops.forEach(c => { icon(c); cx.font = '16px serif'; cx.fillText(frame % 20 < 10 ? '🔴' : '🔵', c.x, c.y - 20); });
-  icon(G.p, G.p.invis > 0 ? .3 : 1);
+  // personagens
+  const nm = (x, y, t) => { cx.fillStyle = '#fff'; cx.font = '11px sans-serif'; cx.textAlign = 'center'; cx.fillText(t, x, y - 48); };
+  Object.values(Net.peers).forEach((q, k) => { drawChar(q.x, q.y, SEATC[q.s | 0], G.time + k, q.mv, q.dir, { a: .9 }); nm(q.x, q.y, q.name || 'Jogador ' + ((q.s | 0) + 1)); });
+  G.cops.forEach(c => {
+    drawChar(c.x, c.y, '#1e4fd8', G.time, c.stun > 0 ? 0 : 1, G.p.x < c.x ? -1 : 1, { cop: 1 });
+    cx.fillStyle = frame % 20 < 10 ? '#f22' : '#26f'; cx.beginPath(); cx.arc(c.x, c.y - 33, 4, 0, 7); cx.fill();
+  });
+  drawChar(G.p.x, G.p.y, SEATC[G.seat], G.time, G.p.mv, G.p.dir, { a: G.p.invis > 0 ? .3 : 1, egg: G.inv.some(i => i.stolen) });
+  nm(G.p.x, G.p.y, G.name || 'Tu');
   G.parts.forEach(q => { cx.fillStyle = q.c; cx.globalAlpha = q.l / 40; cx.fillRect(q.x, q.y, 4, 4); cx.globalAlpha = 1; });
 
   // noite + clima
