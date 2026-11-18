@@ -7,6 +7,15 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div id="menu"><div class="box">
+  <h1>🥚 Brainrot Garden</h1>
+  <button onclick="createRoom()">Criar sala</button>
+  <div class="join"><input id="code" maxlength="6" inputmode="numeric" placeholder="Código (6 números)"><button onclick="joinRoom($('code').value.trim())">Entrar</button></div>
+  <button onclick="findRooms()">Procurar salas</button>
+  <div id="rooms"></div>
+  <button onclick="solo()">Jogar a solo</button>
+  <p id="mstat"></p>
+</div></div>
 <div id="hud"><span id="money"></span><span id="weather"></span><span id="gate"></span><span id="reb"></span></div>
 <div id="main">
   <div id="stage">
@@ -25,9 +34,11 @@
   <button onclick="steal()">Roubar (E)</button>
   <button onclick="plantInv(0)">Plantar (F)</button>
   <button onclick="water()">Regar (R)</button>
+  <button onclick="sellPlant()">Vender planta (V)</button>
   <button onclick="lockGate()">Portão (G)</button>
 </div>
-<p id="help">WASD ou setas para mover. Fica perto da esteira vermelha e compra (B) ou rouba (E). Planta (F) na tua quinta e rega (R). Equipamentos: teclas 1 a 5.</p>
+<p id="help">WASD ou setas para mover. Fica perto da esteira vermelha e compra (B) ou rouba (E). Vende com o 💲 da mochila ou com V perto de uma planta. Planta (F) na tua quinta e rega (R). Equipamentos: teclas 1 a 5.</p>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="database.js"></script>
 <script src="network.js"></script>
 <script src="entities.js"></script>
