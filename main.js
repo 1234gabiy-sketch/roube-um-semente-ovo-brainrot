@@ -1,5 +1,5 @@
 const G = {
-  money: 50, inv: [], plants: [], belt: [], started: false, cops: [], parts: [], traps: [],
+  money: 50, inv: [], plants: [], belt: [], started: false, name: '', admin: false, dev: 'pc', inf: false, fast: false, god: false, ghost: false, fw: null, seat: 0, cops: [], parts: [], traps: [],
   gear: { bat: 0, water: 0, trap: 0, cloak: 0, drink: 0 },
   slots: 4, reb: 0, mult: 1, turbo: 0, weather: 0, wt: 20, bt: 0.5, bs: 4, time: 0,
   gate: { locked: false, t: 0, cd: 0 }, dirty: 1, p: new Player()
@@ -36,6 +36,15 @@ function toast(msg, color = '#333') {
 Net.on(m => {
   const p = G.p;
   if (m.t === 'ann') toast(m.m, '#fa0');
+  if (m.t === 'kill' && (m.to === Net.id || m.to === 'all') && !G.admin) { G.inv = G.inv.filter(i => !i.stolen); p.x = 450; p.y = 252; p.jail = 180; toast('☠️ Foste morto pelo ADM!', '#000'); G.dirty = 1; }
+  if (m.t === 'kick' && m.to === Net.id && !G.admin) { alert('Foste expulso da sala pelo ADM'); location.reload(); }
+  if (m.t === 'seat') { G.seat = m.n; respawn(); toast('Estás na Base ' + (m.n + 1), '#3a3'); }
+  if (m.t === 'full') { toast('Sala cheia (máximo 8 jogadores)', '#e33'); setTimeout(() => location.reload(), 1800); }
+  if (m.t === 'rob' && m.to === Net.id) {
+    const pl = G.plants.find(q => q.slot === m.slot && q.ready);
+    if (pl && !G.gate.locked) { G.plants = G.plants.filter(q => q !== pl); Net.send({ t: 'loot', to: m.id, e: pl.e.id }); sfx('alarm'); toast('🚨 Roubaram-te ' + pl.e.name + '!', '#e33'); }
+  }
+  if (m.t === 'loot' && m.to === Net.id) { G.inv.push({ e: EGGS[m.e], stolen: true }); G.dirty = 1; heat(); }
   if (m.t === 'take') G.belt = G.belt.filter(b => b.k !== m.k);
   if (m.t === 'belt' && Net.hostConn) {
     const old = Object.fromEntries(G.belt.map(b => [b.k, b]));
@@ -92,11 +101,23 @@ function buy() {
   if (G.money < b.e.price) return toast('💸 Sem dinheiro para ' + b.e.name, '#fa0');
   G.money -= b.e.price; take(b, false); sfx('coin');
 }
-function steal() {
-  const b = nearBelt(); if (!b || G.p.jail) return;
-  take(b, true); sfx('alarm');
+function heat() {
+  sfx('alarm');
   if (G.reb > 0 && Math.random() < .5) toast('🤑 Polícia Subornado! Ninguém viu nada...', '#3a3');
   else { G.cops.push(new Cop(G.p)); sfx('siren'); toast('🚨 ROUBASTE! Polícia Brainrot a caminho!', '#e33'); }
+}
+function steal() {
+  if (G.p.jail) return;
+  const b = nearBelt();
+  if (b) { take(b, true); return heat(); }
+  for (const [id, f] of Object.entries(Net.farms)) {
+    if (f.g || f.s === G.seat) continue; // base trancada ou a tua
+    for (const a of f.l) {
+      const [x, y] = slotPos(a[2], f.s);
+      if (a[3] && Math.hypot(x - G.p.x, y - G.p.y) < 45) { Net.send({ t: 'rob', to: id, slot: a[2] }); return toast('🥷 A roubar...', '#555'); }
+    }
+  }
+  toast('Nada para roubar aqui (base trancada ou longe)', '#fa0');
 }
 function plantInv(i) {
   const it = G.inv[i]; if (!it || G.p.jail) return;
@@ -140,10 +161,11 @@ function rebirth() {
 
 // ---------- Interface ----------
 function ui() {
-  $('money').textContent = '💰 ' + fmt(G.money) + ' (+' + fmt(income()) + '/s)';
+  if (G.admin) $('aplayers').textContent = 'Jogadores: ' + Object.values(Net.peers).map(q => q.name || '?').join(', ');
+  $('money').textContent = '💰 ' + (G.inf ? '∞' : fmt(G.money)) + ' (+' + fmt(income()) + '/s)';
   $('weather').textContent = WEATHER[G.weather].n;
   $('gate').textContent = G.gate.locked ? '🔒 Portão ' + Math.ceil(G.gate.t) + 's' : G.gate.cd > 0 ? '⏳ Portão ' + Math.ceil(G.gate.cd) + 's' : '🔓 Portão aberto (G)';
-  $('reb').textContent = '🔄 Rebirth ' + G.reb + ' | ' + (Net.code ? 'Sala ' + Net.code + ' (' + (Object.keys(Net.peers).length + 1) + ' jogadores)' : 'Solo');
+  $('reb').textContent = '🔄 Rebirth ' + G.reb + ' | ' + (Net.code ? 'Sala ' + Net.code + ' (' + (Object.keys(Net.peers).length + 1) + '/8 jogadores)' : 'Solo');
   $('rbtn').textContent = 'Rebirth por $' + fmt(20000 * (G.reb + 1));
   if (!G.dirty) return; G.dirty = 0;
   $('shop').innerHTML = GEAR.map((g, i) =>
@@ -163,9 +185,53 @@ function sellPlant() {
   G.money += Math.floor(b.e.price * .6 * MUT[b.mut].m); G.plants = G.plants.filter(p => p !== b); sfx('coin');
 }
 
+// ---------- Login, dispositivo, controlo PS ----------
+const lst = t => $('lstat').textContent = t;
+const hash = s => { let x = 5381; for (const c of s) x = (x * 33) ^ c.charCodeAt(0); return x >>> 0; };
+function login() {
+  const n = $('ln').value.trim(), p = $('lp').value;
+  if (!n || n.length > 12) return lst('Escreve um nome (até 12 letras)');
+  if (n === 'ADM') { if (p !== 'Six seven') return lst('Senha errada'); G.admin = true; $('adminBtn').style.display = 'block'; }
+  else {
+    if (!p) return lst('Escolhe uma senha');
+    let acc = {}; try { acc = JSON.parse(localStorage.getItem('brz-acc') || '{}'); } catch (e) {}
+    if (acc[n] && acc[n] !== hash(p)) return lst('Senha errada para esse nome');
+    acc[n] = hash(p); try { localStorage.setItem('brz-acc', JSON.stringify(acc)); } catch (e) {}
+  }
+  G.name = n; $('login').style.display = 'none'; $('device').style.display = 'flex';
+}
+const HELP = {
+  pc: 'WASD ou setas para mover, B comprar, E roubar (esteira ou ovos maduros de bases abertas), F plantar, R regar, V vender planta, G portão, 1 a 5 equipamento.',
+  mobile: 'Joystick para mover e botões em baixo para as ações. Equipamentos na loja ao lado.',
+  ps: 'Analógico esquerdo mover, ✕ comprar, ○ roubar, □ plantar, △ regar, L1 portão, R1 vender, L2 taco, R2 energia, setas: capa, armadilha, regador.'
+};
+function setDevice(d) { G.dev = d; document.body.dataset.dev = d; $('help').textContent = HELP[d]; $('device').style.display = 'none'; $('menu').style.display = 'flex'; }
+const padPrev = [];
+function pad() {
+  if (G.dev !== 'ps' || !navigator.getGamepads) return;
+  const gp = navigator.getGamepads()[0]; if (!gp) return;
+  const acts = { 0: buy, 1: steal, 2: () => plantInv(0), 3: water, 4: lockGate, 5: sellPlant, 6: () => useGear('bat'), 7: () => useGear('drink'), 12: () => useGear('cloak'), 13: () => useGear('trap'), 14: () => useGear('water') };
+  for (const k in acts) { const d = !!(gp.buttons[k] && gp.buttons[k].pressed); if (d && !padPrev[k]) acts[k](); padPrev[k] = d; }
+  const dz = v => Math.abs(v) > .2 ? v : 0; Input.jx = dz(gp.axes[0]); Input.jy = dz(gp.axes[1]);
+}
+
+// ---------- Painel ADM ----------
+function tg(k) { G[k] = !G[k]; toast(k + (G[k] ? ' ligado' : ' desligado'), '#555'); }
+function adminGive() { G.inv.push({ e: EGGS[+$('aegg').value], stolen: false }); G.dirty = 1; }
+function adminWeather() { G.fw = +$('awt').value; G.wt = 0; }
+function adminCmd() {
+  const [c, ...r] = $('acmd').value.trim().split(' '), a = r.join(' '); $('acmd').value = '';
+  const who = () => a === 'all' ? 'all' : (Object.entries(Net.peers).find(([, q]) => q.name === a) || [])[0];
+  if (c === '/kill' || c === '/kick') { const id = who(); if (!id) return toast('Jogador não encontrado', '#fa0'); Net.send({ t: c.slice(1), to: id }); toast(c + ' ' + a, '#555'); }
+  else if (c === '/say') { Net.send({ t: 'ann', m: '📢 ADM: ' + a }); toast('📢 ADM: ' + a, '#fa0'); }
+  else if (c === '/money') G.money += +a || 0;
+  else toast('Comandos: /kill nome|all, /kick nome, /say texto, /money n', '#fa0');
+}
+
 // ---------- Menu de salas ----------
 const mst = t => $('mstat').textContent = t;
-function startGame() { G.started = true; $('menu').style.display = 'none'; G.dirty = 1; }
+function respawn() { const [bx, by] = basePos(G.seat); G.p.x = bx + 100; G.p.y = G.seat < 4 ? by - 12 : by + 227; }
+function startGame() { respawn(); G.started = true; $('menu').style.display = 'none'; G.dirty = 1; }
 function solo() { startGame(); }
 function createRoom() { mst('A criar sala...'); Net.create(c => { toast('Sala criada! Código: ' + c, '#3a3'); startGame(); }, e => mst('Erro: ' + e)); }
 function joinRoom(c) {
@@ -176,5 +242,7 @@ function findRooms() {
   $('rooms').textContent = 'A procurar...';
   Net.list(l => { $('rooms').innerHTML = l.length ? l.map(c => `<button onclick="joinRoom('${c}')">Sala ${c}</button>`).join('') : 'Nenhuma sala encontrada'; });
 }
+$('aegg').innerHTML = EGGS.map(e => `<option value="${e.id}">${RAR[e.r].n}: ${e.name}</option>`).join('');
+$('awt').innerHTML = WEATHER.map((w, i) => `<option value="${i}">${w.n}</option>`).join('');
 setInterval(ui, 200);
 requestAnimationFrame(loop);
